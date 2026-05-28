@@ -9,55 +9,148 @@
 <body>
   <div class="container">
     <!-- HEADER -->
-    <header class="header">
-      <div class="header-content">
-        <h1>📦 DNA - Inventario</h1>
-        <p>Visualiza los productos disponibles</p>
-      </div>
-    </header>
+    <div class="header">
+      <h1>🎁 DNA - Inventario</h1>
+      <p>Sistema de Consignación</p>
+    </div>
 
-    <!-- SEARCH & FILTER SECTION -->
-    <section class="controls">
-      <div class="search-box">
-        <input 
-          type="text" 
-          id="searchInput" 
-          placeholder="🔍 Buscar producto..." 
-          class="search-input"
-        >
+    <!-- MAIN CONTENT -->
+    <div id="mainView">
+      <!-- CONTROLS -->
+      <div class="controls">
+        <div class="search-box">
+          <input 
+            type="text" 
+            id="searchInput" 
+            class="search-input" 
+            placeholder="🔍 Buscar producto..."
+          >
+        </div>
+        
+        <div class="filter-box">
+          <label>📁 Categoría:</label>
+          <select id="categoryFilter" class="filter-select">
+            <option value="">-- Todas --</option>
+          </select>
+        </div>
+        
+        <div class="info-box">
+          <span id="productCount">0 productos</span>
+        </div>
       </div>
 
-      <div class="filter-box">
-        <label for="categoryFilter">📁 Categoría:</label>
-        <select id="categoryFilter" class="filter-select">
-          <option value="">-- Todas --</option>
-        </select>
+      <!-- PRODUCTS GRID -->
+      <div class="products-section">
+        <div id="productsGrid" class="products-grid">
+          <div class="loading">Cargando productos...</div>
+        </div>
       </div>
 
-      <div class="info-box">
-        <span id="productCount">Cargando...</span>
-      </div>
-    </section>
-
-    <!-- PRODUCTS GRID -->
-    <section class="products-section">
-      <div id="productsList" class="products-grid">
-        <div class="loading">Cargando productos...</div>
-      </div>
-    </section>
-
-    <!-- MODAL -->
-    <div id="productModal" class="modal">
-      <div class="modal-content">
-        <span class="close">&times;</span>
-        <div id="modalBody"></div>
+      <!-- BUTTONS -->
+      <div class="action-buttons">
+        <button id="btnMakerCorte" class="btn-primary">📋 Hacer Corte</button>
+        <button id="btnHistorico" class="btn-secondary">📊 Ver Histórico</button>
       </div>
     </div>
 
-    <!-- ERROR MESSAGE -->
-    <div id="errorMessage" class="error-message"></div>
+    <!-- CORTE VIEW -->
+    <div id="corteView" style="display: none;">
+      <div class="corte-header">
+        <button id="btnVolver" class="btn-back">← Volver</button>
+        <h2>Registrar Corte</h2>
+      </div>
+
+      <div class="corte-content">
+        <!-- FECHA -->
+        <div class="fecha-section">
+          <label for="fechaCorte">📅 Fecha del Corte:</label>
+          <input type="date" id="fechaCorte" class="fecha-input">
+        </div>
+
+        <!-- TABLA EDITABLE -->
+        <div class="tabla-section">
+          <h3>Productos Vendidos</h3>
+          <div class="tabla-container">
+            <table id="cortesTable" class="cortes-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Precio</th>
+                  <th>Vendidos</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="cortesTableBody">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- RESUMEN -->
+        <div class="resumen-section">
+          <div class="resumen-box">
+            <h3>Resumen del Corte</h3>
+            <div class="resumen-row">
+              <span>Total General:</span>
+              <span id="totalGeneral" class="total-value">$0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTONES -->
+        <div class="corte-buttons">
+          <button id="btnGuardarCorte" class="btn-primary">💾 Guardar Corte</button>
+          <button id="btnCancelarCorte" class="btn-secondary">❌ Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORICO VIEW -->
+    <div id="historicoView" style="display: none;">
+      <div class="historico-header">
+        <button id="btnVolverHistorico" class="btn-back">← Volver</button>
+        <h2>Histórico de Cortes</h2>
+      </div>
+
+      <div class="historico-content">
+        <div id="historicoList" class="historico-list">
+          <div class="loading">Cargando histórico...</div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script src="app.js"></script>
+  <!-- MODAL -->
+  <div id="productModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <div class="modal-header">
+        <h2 id="modalProductName"></h2>
+      </div>
+      <div class="modal-body">
+        <div class="detail-row">
+          <span class="detail-label">Categoría:</span>
+          <span class="detail-value" id="modalCategory"></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Precio:</span>
+          <span class="detail-value price" id="modalPrice"></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Cantidad Disponible:</span>
+          <span class="detail-value quantity" id="modalQuantity"></span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-close">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ERROR MESSAGE -->
+  <div id="errorMessage" class="error-message"></div>
+
+  <script src="app-v2.js"></script>
 </body>
 </html>
