@@ -3,7 +3,7 @@
 // Corte functionality
 // ============================================
 
-const API_URL = "https://script.google.com/macros/s/AKfycbwVlbzY8XiVBDLpJrvNqhwW8D6z_2NycUf5bolyGSJEYf_YBCnLkTD9d_0BBMA8EShu/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwOUGdMNwiVWnmz6RmberWikNk9IDFr9UJwvZcVM-rEyKRU4fn2IXfEWlirW8EgeU22/exec";
 
 
 
