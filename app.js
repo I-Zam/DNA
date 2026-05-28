@@ -3,7 +3,7 @@
 // Corte functionality
 // ============================================
 
-const API_URL = const API_URL = "https://script.google.com/macros/s/AKfycbxbIdrB1lNprWqxrWC60sLqrNS17EDyaFydvHxybBk6g5Edf2_PAnqjHxxX9yeFVqJw/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwVlbzY8XiVBDLpJrvNqhwW8D6z_2NycUf5bolyGSJEYf_YBCnLkTD9d_0BBMA8EShu/exec";
 
 
 let allProductos = [];
