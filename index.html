@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DNA - Inventario de Consignación</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-content">
+        <h1>📦 DNA - Inventario</h1>
+        <p>Visualiza los productos disponibles</p>
+      </div>
+    </header>
+
+    <!-- SEARCH & FILTER SECTION -->
+    <section class="controls">
+      <div class="search-box">
+        <input 
+          type="text" 
+          id="searchInput" 
+          placeholder="🔍 Buscar producto..." 
+          class="search-input"
+        >
+      </div>
+
+      <div class="filter-box">
+        <label for="categoryFilter">📁 Categoría:</label>
+        <select id="categoryFilter" class="filter-select">
+          <option value="">-- Todas --</option>
+        </select>
+      </div>
+
+      <div class="info-box">
+        <span id="productCount">Cargando...</span>
+      </div>
+    </section>
+
+    <!-- PRODUCTS GRID -->
+    <section class="products-section">
+      <div id="productsList" class="products-grid">
+        <div class="loading">Cargando productos...</div>
+      </div>
+    </section>
+
+    <!-- MODAL -->
+    <div id="productModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <div id="modalBody"></div>
+      </div>
+    </div>
+
+    <!-- ERROR MESSAGE -->
+    <div id="errorMessage" class="error-message"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
