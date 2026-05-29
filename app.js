@@ -1,15 +1,16 @@
 // ============================================
-// DNA VENDOR PAGE - APP V2
-// Corte functionality
+// DNA VENDOR PAGE - APP V3
+// Google Sheets API + LocalStorage
 // ============================================
 
-const API_URL = "https://script.google.com/macros/s/AKfycbwOUGdMNwiVWnmz6RmberWikNk9IDFr9UJwvZcVM-rEyKRU4fn2IXfEWlirW8EgeU22/exec";
-
-
+// Google Sheets API Configuration
+const SPREADSHEET_ID = "1087dwmhk12RM-YFRYxKO2VEO2DPIkTRjNbhokm9GDJA";
+const SHEET_NAME = "DNA";
+const API_KEY = "AIzaSyDGfNsMn-X_a6KgDmQeN7O7nT5YpqxlR0c";
 
 let allProductos = [];
 let filteredProductos = [];
-let currentCorteData = [];
+let cortes = [];
 
 // ============================================
 // INIT
@@ -18,6 +19,7 @@ let currentCorteData = [];
 document.addEventListener("DOMContentLoaded", function() {
   initEventListeners();
   loadProductos();
+  loadCortes();
   setFechaHoy();
 });
 
@@ -41,6 +43,7 @@ function initEventListeners() {
   document.getElementById("btnVolverHistorico").addEventListener("click", showMainView);
   document.getElementById("btnCancelarCorte").addEventListener("click", showMainView);
   document.getElementById("btnGuardarCorte").addEventListener("click", guardarCorte);
+  document.getElementById("btnDescargarCortes").addEventListener("click", descargarCortes);
 
   // Corte table input
   document.addEventListener("input", function(e) {
@@ -51,17 +54,34 @@ function initEventListeners() {
 }
 
 // ============================================
-// LOAD PRODUCTOS
+// LOAD PRODUCTOS FROM GOOGLE SHEETS
 // ============================================
 
 function loadProductos() {
-  const url = `${API_URL}?action=getProductos`;
+  // Using Google Sheets API v4
+  const range = `${SHEET_NAME}!A:D`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?key=${API_KEY}`;
   
-  fetch(url)
+  fetch(url )
     .then(response => response.json())
     .then(data => {
-      if (data.success) {
-        allProductos = data.data;
+      if (data.values) {
+        allProductos = [];
+        
+        // Skip header (row 1)
+        for (let i = 1; i < data.values.length; i++) {
+          const row = data.values[i];
+          
+          if (row[0] && row[1] && row[2]) {
+            allProductos.push({
+              categoria: row[0] || "",
+              producto: row[1] || "",
+              precio: parseFloat(row[2]) || 0,
+              cantidad: parseFloat(row[3]) || 0
+            });
+          }
+        }
+        
         filteredProductos = [...allProductos];
         
         // Populate category filter
@@ -76,10 +96,13 @@ function loadProductos() {
         
         renderProductos();
       } else {
-        showError("Error al cargar productos: " + data.error);
+        showError("Error al cargar productos");
       }
     })
-    .catch(error => showError("Error de conexión: " + error));
+    .catch(error => {
+      console.error("Error:", error);
+      showError("Error de conexión: " + error);
+    });
 }
 
 // ============================================
@@ -178,7 +201,7 @@ function showHistoricoView() {
   document.getElementById("corteView").style.display = "none";
   document.getElementById("historicoView").style.display = "block";
   
-  loadHistorico();
+  renderHistorico();
 }
 
 // ============================================
@@ -225,7 +248,7 @@ function updateCorteTotal() {
 }
 
 // ============================================
-// GUARDAR CORTE
+// GUARDAR CORTE (LocalStorage)
 // ============================================
 
 function guardarCorte() {
@@ -245,7 +268,8 @@ function guardarCorte() {
       productos.push({
         producto: allProductos[idx].producto,
         precio: allProductos[idx].precio,
-        vendidos: vendidos
+        vendidos: vendidos,
+        total: vendidos * allProductos[idx].precio
       });
     }
   });
@@ -255,30 +279,26 @@ function guardarCorte() {
     return;
   }
   
-  // Save
-  const data = {
-    action: "saveCorte",
+  // Calculate total
+  const totalGeneral = productos.reduce((sum, p) => sum + p.total, 0);
+  
+  // Create corte object
+  const corte = {
     fecha: fecha,
-    productos: productos
+    productos: productos,
+    total: totalGeneral,
+    id: Date.now() // Unique ID
   };
   
-  fetch(API_URL, {
-    method: "POST",
-    body: JSON.stringify(data)
-  })
-    .then(response => response.json())
-    .then(result => {
-      if (result.success) {
-        showError("✅ Corte guardado exitosamente. Total: $" + result.totalGeneral, "success");
-        setTimeout(() => {
-          showMainView();
-          resetCorteForm();
-        }, 2000);
-      } else {
-        showError("Error al guardar: " + result.error);
-      }
-    })
-    .catch(error => showError("Error: " + error));
+  // Save to LocalStorage
+  cortes.push(corte);
+  localStorage.setItem("cortes_dna", JSON.stringify(cortes));
+  
+  showError("✅ Corte guardado exitosamente. Total: $" + totalGeneral, "success");
+  setTimeout(() => {
+    showMainView();
+    resetCorteForm();
+  }, 2000);
 }
 
 function resetCorteForm() {
@@ -289,25 +309,21 @@ function resetCorteForm() {
 }
 
 // ============================================
-// HISTORICO
+// LOAD CORTES FROM LocalStorage
 // ============================================
 
-function loadHistorico() {
-  const url = `${API_URL}?action=getCortes`;
-  
-  fetch(url)
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        renderHistorico(data.data);
-      } else {
-        showError("Error al cargar histórico: " + data.error);
-      }
-    })
-    .catch(error => showError("Error: " + error));
+function loadCortes() {
+  const stored = localStorage.getItem("cortes_dna");
+  if (stored) {
+    cortes = JSON.parse(stored);
+  }
 }
 
-function renderHistorico(cortes) {
+// ============================================
+// RENDER HISTORICO
+// ============================================
+
+function renderHistorico() {
   const list = document.getElementById("historicoList");
   
   if (cortes.length === 0) {
@@ -348,6 +364,37 @@ function renderHistorico(cortes) {
 }
 
 // ============================================
+// DESCARGAR CORTES
+// ============================================
+
+function descargarCortes() {
+  if (cortes.length === 0) {
+    showError("No hay cortes para descargar");
+    return;
+  }
+  
+  // Create CSV
+  let csv = "Fecha,Producto,Precio,Vendidos,Total\n";
+  
+  cortes.forEach(corte => {
+    corte.productos.forEach(p => {
+      csv += `${corte.fecha},${p.producto},${p.precio},${p.vendidos},${p.total}\n`;
+    });
+    csv += `${corte.fecha},TOTAL CORTE,,,${corte.total}\n`;
+  });
+  
+  // Download
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "cortes_dna.csv";
+  a.click();
+  
+  showError("✅ Cortes descargados", "success");
+}
+
+// ============================================
 // HELPERS
 // ============================================
 
@@ -366,3 +413,4 @@ function showError(msg, type = "error") {
     errorDiv.style.display = "none";
   }, 4000);
 }
+
