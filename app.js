@@ -1,416 +1,305 @@
-// ============================================
-// DNA VENDOR PAGE - APP V3
-// Google Sheets API + LocalStorage
-// ============================================
+// DNA Vendor Page - Google Sheets API Integration
+// Reads all products dynamically from Google Sheet
+// API Key: AIzaSyDGfNsMn-X_a6KgDmQeN7O7nT5YpqxlR0c
 
-// Google Sheets API Configuration
-const SPREADSHEET_ID = "1087dwmhk12RM-YFRYxKO2VEO2DPIkTRjNbhokm9GDJA";
-const SHEET_NAME = "DNA";
-const API_KEY = "AIzaSyDGfNsMn-X_a6KgDmQeN7O7nT5YpqxlR0c";
+const API_KEY = 'AIzaSyDGfNsMn-X_a6KgDmQeN7O7nT5YpqxlR0c';
+const SPREADSHEET_ID = '1087dwmhk12RM-YFRYxKO2VEO2DPIkTRjNbhokm9GDJA'; // DNA Sheet ID
+const RANGE = 'DNA!A:F'; // Read all columns
+const CORTES_RANGE = 'CORTES_DNA!A:F';
 
-let allProductos = [];
-let filteredProductos = [];
-let cortes = [];
+let products = [];
+let salesData = [];
 
-// ============================================
-// INIT
-// ============================================
-
-document.addEventListener("DOMContentLoaded", function() {
-  initEventListeners();
-  loadProductos();
-  loadCortes();
-  setFechaHoy();
+// Initialize app
+document.addEventListener('DOMContentLoaded', () => {
+  loadProductsFromSheets();
+  loadSalesFromLocalStorage();
 });
 
-function initEventListeners() {
-  // Search
-  document.getElementById("searchInput").addEventListener("input", filterProductos);
-  document.getElementById("categoryFilter").addEventListener("change", filterProductos);
-
-  // Modal
-  document.querySelector(".close").addEventListener("click", closeModal);
-  document.querySelector(".btn-close").addEventListener("click", closeModal);
-  window.addEventListener("click", function(e) {
-    const modal = document.getElementById("productModal");
-    if (e.target === modal) closeModal();
-  });
-
-  // Corte buttons
-  document.getElementById("btnMakerCorte").addEventListener("click", showCorteView);
-  document.getElementById("btnHistorico").addEventListener("click", showHistoricoView);
-  document.getElementById("btnVolver").addEventListener("click", showMainView);
-  document.getElementById("btnVolverHistorico").addEventListener("click", showMainView);
-  document.getElementById("btnCancelarCorte").addEventListener("click", showMainView);
-  document.getElementById("btnGuardarCorte").addEventListener("click", guardarCorte);
-  document.getElementById("btnDescargarCortes").addEventListener("click", descargarCortes);
-
-  // Corte table input
-  document.addEventListener("input", function(e) {
-    if (e.target.classList.contains("vendidos-input")) {
-      updateCorteTotal();
+// Fetch products from Google Sheets
+async function loadProductsFromSheets() {
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${RANGE}?key=${API_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.values) {
+      // Skip header row and parse products
+      // Column mapping: A=Categoria, B=Producto, C=Precio, D=Cantidad, E=Vendidos, F=Venta
+      products = data.values.slice(1).map((row, index) => ({
+        id: index,
+        categoria: row[0] || 'General',
+        producto: row[1] || 'Unknown',
+        precio: parseInt(row[2]) || 0,
+        cantidad: parseInt(row[3]) || 0,
+        vendidos: parseInt(row[4]) || 0,
+        venta: parseInt(row[5]) || 0
+      })).filter(p => p.producto !== 'Unknown' && p.producto.trim() !== '');
+      
+      renderProductGrid();
+      populateCategories();
     }
+  } catch (error) {
+    console.error('Error loading products:', error);
+    alert('Error loading products from Google Sheets');
+  }
+}
+
+// Populate category filter
+function populateCategories() {
+  const categories = [...new Set(products.map(p => p.categoria).filter(c => c))];
+  const select = document.getElementById('categoryFilter');
+  
+  // Clear existing options except first
+  while (select.options.length > 1) {
+    select.remove(1);
+  }
+  
+  categories.forEach(cat => {
+    const option = document.createElement('option');
+    option.value = cat;
+    option.textContent = cat;
+    select.appendChild(option);
   });
 }
 
-// ============================================
-// LOAD PRODUCTOS FROM GOOGLE SHEETS
-// ============================================
-
-function loadProductos() {
-  // Using Google Sheets API v4
-  const range = `${SHEET_NAME}!A:D`;
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?key=${API_KEY}`;
+// Render product grid
+function renderProductGrid() {
+  const grid = document.getElementById('productGrid');
+  grid.innerHTML = '';
   
-  fetch(url )
-    .then(response => response.json())
-    .then(data => {
-      if (data.values) {
-        allProductos = [];
-        
-        // Skip header (row 1)
-        for (let i = 1; i < data.values.length; i++) {
-          const row = data.values[i];
-          
-          if (row[0] && row[1] && row[2]) {
-            allProductos.push({
-              categoria: row[0] || "",
-              producto: row[1] || "",
-              precio: parseFloat(row[2]) || 0,
-              cantidad: parseFloat(row[3]) || 0
-            });
-          }
-        }
-        
-        filteredProductos = [...allProductos];
-        
-        // Populate category filter
-        const categories = [...new Set(allProductos.map(p => p.categoria))];
-        const categoryFilter = document.getElementById("categoryFilter");
-        categories.forEach(cat => {
-          const option = document.createElement("option");
-          option.value = cat;
-          option.textContent = cat;
-          categoryFilter.appendChild(option);
-        });
-        
-        renderProductos();
-      } else {
-        showError("Error al cargar productos");
-      }
-    })
-    .catch(error => {
-      console.error("Error:", error);
-      showError("Error de conexión: " + error);
-    });
+  if (products.length === 0) {
+    grid.innerHTML = '<div class="loading">No products found</div>';
+    return;
+  }
+  
+  products.forEach(product => {
+    const card = document.createElement('div');
+    card.className = 'product-card';
+    
+    const stockClass = product.cantidad <= 0 ? 'out-of-stock' : '';
+    
+    card.innerHTML = `
+      <span class="product-category">${product.categoria}</span>
+      <h3>${product.producto}</h3>
+      <p class="price">$${product.precio}</p>
+      <p class="quantity ${stockClass}">Disponible: ${product.cantidad} unidades</p>
+      <button onclick="openSaleModal(${product.id})" ${product.cantidad <= 0 ? 'disabled' : ''}>
+        ${product.cantidad <= 0 ? 'Agotado' : 'Ver Detalles'}
+      </button>
+    `;
+    grid.appendChild(card);
+  });
+  
+  updateProductCount();
 }
 
-// ============================================
-// FILTER PRODUCTOS
-// ============================================
+// Update product count
+function updateProductCount() {
+  document.getElementById('productCount').textContent = `${products.length} productos`;
+}
 
-function filterProductos() {
-  const searchTerm = document.getElementById("searchInput").value.toLowerCase();
-  const categoryTerm = document.getElementById("categoryFilter").value;
+// Search and filter products
+function filterProducts() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const category = document.getElementById('categoryFilter').value;
   
-  filteredProductos = allProductos.filter(p => {
-    const matchSearch = p.producto.toLowerCase().includes(searchTerm);
-    const matchCategory = categoryTerm === "" || p.categoria === categoryTerm;
+  const filtered = products.filter(p => {
+    const matchSearch = p.producto.toLowerCase().includes(search);
+    const matchCategory = !category || p.categoria === category;
     return matchSearch && matchCategory;
   });
   
-  renderProductos();
+  displayFilteredProducts(filtered);
 }
 
-// ============================================
-// RENDER PRODUCTOS
-// ============================================
-
-function renderProductos() {
-  const grid = document.getElementById("productsGrid");
+// Display filtered products
+function displayFilteredProducts(filtered) {
+  const grid = document.getElementById('productGrid');
+  grid.innerHTML = '';
   
-  if (filteredProductos.length === 0) {
-    grid.innerHTML = '<div class="no-results">No se encontraron productos</div>';
-    document.getElementById("productCount").textContent = "0 productos";
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div class="loading">No products found</div>';
     return;
   }
   
-  grid.innerHTML = filteredProductos.map((p, idx) => `
-    <div class="product-card" onclick="openModal(${idx})">
-      <div class="product-header">
-        <h3>${p.producto}</h3>
-        <span class="category-badge">${p.categoria}</span>
-      </div>
-      <div class="product-info">
-        <div class="info-row">
-          <span class="label">Precio:</span>
-          <span class="value">$${p.precio}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">Disponible:</span>
-          <span class="value">${p.cantidad} unidades</span>
-        </div>
-      </div>
-      <div class="product-footer">
-        <button class="btn-view">Ver Detalles</button>
-      </div>
-    </div>
-  `).join("");
-  
-  document.getElementById("productCount").textContent = `${filteredProductos.length} productos`;
+  filtered.forEach(product => {
+    const card = document.createElement('div');
+    card.className = 'product-card';
+    
+    const stockClass = product.cantidad <= 0 ? 'out-of-stock' : '';
+    
+    card.innerHTML = `
+      <span class="product-category">${product.categoria}</span>
+      <h3>${product.producto}</h3>
+      <p class="price">$${product.precio}</p>
+      <p class="quantity ${stockClass}">Disponible: ${product.cantidad} unidades</p>
+      <button onclick="openSaleModal(${product.id})" ${product.cantidad <= 0 ? 'disabled' : ''}>
+        ${product.cantidad <= 0 ? 'Agotado' : 'Ver Detalles'}
+      </button>
+    `;
+    grid.appendChild(card);
+  });
 }
 
-// ============================================
-// MODAL
-// ============================================
-
-function openModal(idx) {
-  const p = filteredProductos[idx];
-  document.getElementById("modalProductName").textContent = p.producto;
-  document.getElementById("modalCategory").textContent = p.categoria;
-  document.getElementById("modalPrice").textContent = `$${p.precio}`;
-  document.getElementById("modalQuantity").textContent = `${p.cantidad} unidades`;
+// Open sale recording modal
+function openSaleModal(productId) {
+  const product = products[productId];
   
-  document.getElementById("productModal").style.display = "block";
+  if (product.cantidad <= 0) {
+    alert('Este producto está agotado');
+    return;
+  }
+  
+  document.getElementById('modalProductName').textContent = product.producto;
+  document.getElementById('modalProductCategory').textContent = product.categoria;
+  document.getElementById('modalProductPrice').textContent = `$${product.precio}`;
+  document.getElementById('modalProductStock').textContent = `${product.cantidad} unidades`;
+  document.getElementById('saleQuantity').value = 1;
+  document.getElementById('saleQuantity').max = product.cantidad;
+  document.getElementById('saleModal').style.display = 'flex';
+  document.getElementById('saleModal').dataset.productId = productId;
+  
+  // Trigger calculation
+  document.getElementById('saleQuantity').dispatchEvent(new Event('input'));
 }
 
+// Close modal
 function closeModal() {
-  document.getElementById("productModal").style.display = "none";
+  document.getElementById('saleModal').style.display = 'none';
 }
 
-// ============================================
-// CORTE VIEW
-// ============================================
-
-function showCorteView() {
-  document.getElementById("mainView").style.display = "none";
-  document.getElementById("corteView").style.display = "block";
-  document.getElementById("historicoView").style.display = "none";
+// Record sale
+function recordSale() {
+  const productId = parseInt(document.getElementById('saleModal').dataset.productId);
+  const quantity = parseInt(document.getElementById('saleQuantity').value);
+  const product = products[productId];
   
-  renderCorteTable();
-}
-
-function showMainView() {
-  document.getElementById("mainView").style.display = "block";
-  document.getElementById("corteView").style.display = "none";
-  document.getElementById("historicoView").style.display = "none";
-}
-
-function showHistoricoView() {
-  document.getElementById("mainView").style.display = "none";
-  document.getElementById("corteView").style.display = "none";
-  document.getElementById("historicoView").style.display = "block";
-  
-  renderHistorico();
-}
-
-// ============================================
-// CORTE TABLE
-// ============================================
-
-function renderCorteTable() {
-  const tbody = document.getElementById("cortesTableBody");
-  
-  tbody.innerHTML = allProductos.map((p, idx) => `
-    <tr>
-      <td>${p.producto}</td>
-      <td>$${p.precio}</td>
-      <td>
-        <input 
-          type="number" 
-          class="vendidos-input" 
-          value="0" 
-          min="0"
-          data-idx="${idx}"
-          data-precio="${p.precio}"
-        >
-      </td>
-      <td class="total-cell">$0</td>
-    </tr>
-  `).join("");
-}
-
-function updateCorteTotal() {
-  let totalGeneral = 0;
-  
-  document.querySelectorAll(".vendidos-input").forEach(input => {
-    const vendidos = parseInt(input.value) || 0;
-    const precio = parseFloat(input.dataset.precio);
-    const total = vendidos * precio;
-    
-    const totalCell = input.parentElement.parentElement.querySelector(".total-cell");
-    totalCell.textContent = `$${total}`;
-    
-    totalGeneral += total;
-  });
-  
-  document.getElementById("totalGeneral").textContent = `$${totalGeneral}`;
-}
-
-// ============================================
-// GUARDAR CORTE (LocalStorage)
-// ============================================
-
-function guardarCorte() {
-  const fecha = document.getElementById("fechaCorte").value;
-  
-  if (!fecha) {
-    showError("Por favor selecciona una fecha");
+  if (quantity <= 0 || quantity > product.cantidad) {
+    alert('Cantidad inválida');
     return;
   }
   
-  // Collect data
-  const productos = [];
-  document.querySelectorAll(".vendidos-input").forEach((input, idx) => {
-    const vendidos = parseInt(input.value) || 0;
-    
-    if (vendidos > 0) {
-      productos.push({
-        producto: allProductos[idx].producto,
-        precio: allProductos[idx].precio,
-        vendidos: vendidos,
-        total: vendidos * allProductos[idx].precio
-      });
-    }
-  });
+  const totalSale = product.precio * quantity;
   
-  if (productos.length === 0) {
-    showError("Debes registrar al menos un producto vendido");
-    return;
-  }
-  
-  // Calculate total
-  const totalGeneral = productos.reduce((sum, p) => sum + p.total, 0);
-  
-  // Create corte object
-  const corte = {
-    fecha: fecha,
-    productos: productos,
-    total: totalGeneral,
-    id: Date.now() // Unique ID
+  const sale = {
+    id: Date.now(),
+    productId: productId,
+    producto: product.producto,
+    cantidad: quantity,
+    precio: product.precio,
+    total: totalSale,
+    timestamp: new Date().toISOString(),
+    date: new Date().toLocaleDateString('es-ES')
   };
   
-  // Save to LocalStorage
-  cortes.push(corte);
-  localStorage.setItem("cortes_dna", JSON.stringify(cortes));
+  salesData.push(sale);
+  saveSalesToLocalStorage();
   
-  showError("✅ Corte guardado exitosamente. Total: $" + totalGeneral, "success");
-  setTimeout(() => {
-    showMainView();
-    resetCorteForm();
-  }, 2000);
+  // Update local product quantity
+  product.cantidad -= quantity;
+  product.vendidos += quantity;
+  product.venta += totalSale;
+  
+  renderProductGrid();
+  updateDailySummary();
+  closeModal();
+  
+  alert(`Venta registrada!\nProducto: ${product.producto}\nCantidad: ${quantity}\nTotal: $${totalSale}`);
 }
 
-function resetCorteForm() {
-  document.getElementById("fechaCorte").value = "";
-  document.querySelectorAll(".vendidos-input").forEach(input => input.value = "0");
-  updateCorteTotal();
-  setFechaHoy();
+// Save sales to LocalStorage
+function saveSalesToLocalStorage() {
+  localStorage.setItem('dna_sales', JSON.stringify(salesData));
 }
 
-// ============================================
-// LOAD CORTES FROM LocalStorage
-// ============================================
-
-function loadCortes() {
-  const stored = localStorage.getItem("cortes_dna");
-  if (stored) {
-    cortes = JSON.parse(stored);
+// Load sales from LocalStorage
+function loadSalesFromLocalStorage() {
+  const saved = localStorage.getItem('dna_sales');
+  if (saved) {
+    salesData = JSON.parse(saved);
   }
 }
 
-// ============================================
-// RENDER HISTORICO
-// ============================================
-
-function renderHistorico() {
-  const list = document.getElementById("historicoList");
+// Update daily summary
+function updateDailySummary() {
+  const today = new Date().toLocaleDateString('es-ES');
+  const todaySales = salesData.filter(sale => sale.date === today);
   
-  if (cortes.length === 0) {
-    list.innerHTML = '<div class="no-results">No hay cortes registrados</div>';
+  const totalSale = todaySales.reduce((sum, sale) => sum + sale.total, 0);
+  const totalQuantity = todaySales.reduce((sum, sale) => sum + sale.cantidad, 0);
+  
+  document.getElementById('totalSale').textContent = `$${totalSale.toFixed(2)}`;
+  document.getElementById('totalQuantity').textContent = `${totalQuantity} unidades`;
+  
+  renderSalesTable(todaySales);
+}
+
+// Render sales table
+function renderSalesTable(sales) {
+  const tbody = document.getElementById('salesTableBody');
+  tbody.innerHTML = '';
+  
+  if (sales.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="no-data">No sales recorded yet</td></tr>';
     return;
   }
   
-  list.innerHTML = cortes.map(corte => `
-    <div class="corte-card">
-      <div class="corte-card-header">
-        <h3>📅 ${corte.fecha}</h3>
-        <span class="corte-total">Total: <strong>$${corte.total}</strong></span>
-      </div>
-      <div class="corte-card-body">
-        <table class="mini-table">
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Precio</th>
-              <th>Vendidos</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${corte.productos.map(p => `
-              <tr>
-                <td>${p.producto}</td>
-                <td>$${p.precio}</td>
-                <td>${p.vendidos}</td>
-                <td>$${p.total}</td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `).join("");
+  sales.forEach(sale => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${sale.producto}</td>
+      <td>${sale.cantidad}</td>
+      <td>$${sale.precio}</td>
+      <td>$${sale.total}</td>
+      <td><button onclick="deleteSale(${sale.id})" class="delete-btn">Eliminar</button></td>
+    `;
+    tbody.appendChild(row);
+  });
 }
 
-// ============================================
-// DESCARGAR CORTES
-// ============================================
+// Delete sale
+function deleteSale(saleId) {
+  if (confirm('¿Estás seguro de que quieres eliminar esta venta?')) {
+    salesData = salesData.filter(sale => sale.id !== saleId);
+    saveSalesToLocalStorage();
+    updateDailySummary();
+  }
+}
 
-function descargarCortes() {
-  if (cortes.length === 0) {
-    showError("No hay cortes para descargar");
+// Export to CSV
+function exportToCSV() {
+  const today = new Date().toLocaleDateString('es-ES');
+  const todaySales = salesData.filter(sale => sale.date === today);
+  
+  if (todaySales.length === 0) {
+    alert('No hay ventas para exportar');
     return;
   }
   
-  // Create CSV
-  let csv = "Fecha,Producto,Precio,Vendidos,Total\n";
+  let csv = 'Producto,Cantidad,Precio Unitario,Total,Hora\n';
   
-  cortes.forEach(corte => {
-    corte.productos.forEach(p => {
-      csv += `${corte.fecha},${p.producto},${p.precio},${p.vendidos},${p.total}\n`;
-    });
-    csv += `${corte.fecha},TOTAL CORTE,,,${corte.total}\n`;
+  todaySales.forEach(sale => {
+    csv += `"${sale.producto}",${sale.cantidad},$${sale.precio},$${sale.total},"${sale.timestamp}"\n`;
   });
   
-  // Download
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "cortes_dna.csv";
-  a.click();
-  
-  showError("✅ Cortes descargados", "success");
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `DNA_Ventas_${today}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
-// ============================================
-// HELPERS
-// ============================================
-
-function setFechaHoy() {
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById("fechaCorte").value = today;
+// Hacer corte
+function hacerCorte() {
+  alert('Función de corte en desarrollo');
 }
 
-function showError(msg, type = "error") {
-  const errorDiv = document.getElementById("errorMessage");
-  errorDiv.textContent = msg;
-  errorDiv.style.display = "block";
-  errorDiv.style.background = type === "success" ? "#4caf50" : "#ff6b6b";
-  
-  setTimeout(() => {
-    errorDiv.style.display = "none";
-  }, 4000);
+// Ver histórico
+function verHistorico() {
+  alert('Función de histórico en desarrollo');
 }
-
